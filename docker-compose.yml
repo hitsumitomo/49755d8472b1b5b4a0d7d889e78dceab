@@ -1,0 +1,12 @@
+services:
+  vault-app:
+    image: vault-app:latest
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - API_URL=
+      - API_KEY=
+      - API_RO_KEY=
+      - PORT=8080
+    command: ["./app"]

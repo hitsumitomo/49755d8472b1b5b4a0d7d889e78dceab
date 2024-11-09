@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vault</title>
+    <script src="https://code.jquery.com/jquery-latest.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #fff;
+            padding-top: 70px;
+        }
+        #top {
+            position: fixed;
+            top: 0;
+            background-color: rgb(13, 104, 134);
+            padding: 10px;
+            border-radius: 8px;
+            width: 100%;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            display: flex;
+            justify-content: center;
+        }
+        #formContainer {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            margin-top: 10px;
+            box-sizing: border-box;
+        }
+
+        #results {
+            margin-top: 10px;
+            display: flex;
+            justify-content: center;
+        }
+
+        #formContainer {
+            display: none;
+        }
+        #createForm, #searchForm {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #searchForm {
+            display: flex;
+        }
+
+        input, select, button {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div id="top">
+        <select id="actionSelect" style="width: 300px;">
+            <option value="search">Search</option>
+            <option value="create">Create</option>
+        </select>
+    </div>
+
+    <div id="formContainer">
+        <div id="searchForm">
+            <select id="searchType" style="width: 100%; margin-bottom: 10px;">
+                <option value="number">By Number</option>
+                <option value="type">By Type</option>
+            </select>
+            <input type="text" id="searchNumber" style="width: 91%; margin-bottom: 10px;" placeholder="account number" required/>
+            <select id="searchTypeSelect" style="width: 100%; margin-bottom: 10px;">
+                <option value="sending">Sending</option>
+                <option value="receiving">Receiving</option>
+            </select>
+            <button id="searchSubmit" style="width: 100%;">Submit</button>
+        </div>
+
+        <div id="createForm" style="padding-right: 20px;">
+            <input type="text" id="accountNumber" placeholder="Number" style="width: 100%; margin-bottom: 10px;">
+            <input type="text" id="accountName" placeholder="Name" style="width: 100%; margin-bottom: 10px;">
+            <input type="text" id="accountIBAN" placeholder="IBAN" style="width: 100%; margin-bottom: 10px;">
+            <input type="text" id="accountAddress" placeholder="Address" style="width: 100%; margin-bottom: 10px;">
+            <input type="text" id="accountAmount" placeholder="Amount" style="width: 100%; margin-bottom: 10px;" pattern="^\d*\.?\d*$" title="Please enter a valid amount (e.g., 123 or 123.45)">
+            <select id="accountType" style="width: 109%; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px;">
+                <option value="sending">Sending</option>
+                <option value="receiving">Receiving</option>
+            </select>
+            <button id="createSubmit" style="width: 100%;">Submit</button>
+        </div>
+    </div>
+
+    <div id="results" style="width: 100%;"></div>
+
+    <script>
+        $(document).ready(function() {
+            $('#formContainer').show();
+
+            $('#actionSelect').change(function() {
+                if ($(this).val() === 'search') {
+                    $('#searchForm').show();
+                    $('#createForm').hide();
+                    $('#searchNumber').val('');
+                } else {
+                    $('#searchForm').hide();
+                    $('#createForm').show();
+                }
+                $('#results').empty();
+            });
+
+            $('#accountAmount').on('input', function() {
+                let value = this.value.replace(/-/g, '');
+                value = value.replace(/[^0-9.]/g, '');
+                const parts = value.split('.');
+                if (parts.length > 2) {
+                    value = parts[0] + '.' + parts.slice(1).join('');
+                }
+                if (this.value.startsWith('-')) {
+                    value = '-' + value;
+                }
+                this.value = value;
+            });
+
+            $('#searchNumber').show();
+            $('#searchTypeSelect').hide();
+
+            $('#searchType').change(function() {
+                if ($(this).val() === 'number') {
+                    $('#searchNumber').show();
+                    $('#searchTypeSelect').hide();
+                } else {
+                    $('#searchNumber').hide();
+                    $('#searchTypeSelect').show();
+
+                }
+            });
+
+            $('#searchNumber').on('keypress', function(e) {
+                if (e.which === 13) {
+                    $('#searchSubmit').click();
+                }
+            });
+            $('#searchSubmit').click(function() {
+                if ($('#searchType').val() === 'number' && $('#searchNumber').val().trim() === '') {
+                    alert('Please enter a number.');
+                    return;
+                }
+                let searchData;
+                if ($('#searchType').val() === 'number') {
+                    searchData = {
+                        number: $('#searchNumber').val()
+                    };
+                } else {
+                    searchData = {
+                        type: $('#searchTypeSelect').val()
+                    };
+                }
+
+                $.ajax({
+                    url: '/api/get',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(searchData),
+                    success: function(response) {
+                        let resultsHtml = '';
+                        const accounts = Array.isArray(response) ? response : [response];
+                        accounts.forEach(account => {
+                            resultsHtml += `
+                                <div style="display: flex; flex-direction: column; margin: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; width: 300px; background-color: #d4edda;">
+                                    <input type="text" value="${account.number}" readonly style="margin-bottom: 10px;">
+                                    <input type="text" value="${account.name}" readonly style="margin-bottom: 10px;">
+                                    <input type="text" value="${account.iban}" readonly style="margin-bottom: 10px;">
+                                    <input type="text" value="${account.address}" readonly style="margin-bottom: 10px;">
+                                    <input type="text" value="${account.amount}" readonly style="margin-bottom: 10px;">
+                                    <input type="text" value="${account.type}" readonly style="margin-bottom: 10px;">
+                                </div>
+                            `;
+                        });
+                        $('#results').html('<div style="display: flex; flex-wrap: wrap;">' + resultsHtml + '</div>');
+                    },
+                    error: function(error) {
+                        if (error.status === 404) {
+                            $('#results').html('<div style="text-align: center; ; color: red">Not Found</div>');
+                        } else {
+                            $('#results').html('<pre>Error: ' + JSON.stringify(error) + '</pre>');
+                        }
+                    }
+                });
+            });
+
+            $('#createSubmit').click(function() {
+                const formData = {
+                    number: $('#accountNumber').val(),
+                    name: $('#accountName').val(),
+                    iban: $('#accountIBAN').val(),
+                    address: $('#accountAddress').val(),
+                    amount: parseFloat($('#accountAmount').val()),
+                    type: $('#accountType').val()
+                };
+
+                $.ajax({
+                    url: '/api/add',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(formData),
+                    success: function(response) {
+                        $('#results').html('<div style="text-align: center; color: green">Account created successfully.</div>');
+                        $('#accountNumber').val('');
+                        $('#accountName').val('');
+                        $('#accountIBAN').val('');
+                        $('#accountAddress').val('');
+                        $('#accountAmount').val('');
+                        $('#accountType').val('sending');
+                    },
+                    error: function(error) {
+                        if (error.status === 409) {
+                            $('#results').html('<div style="text-align: center; color: red">Account already exists.</div>');
+                        } else if (error.status === 400) {
+                            $('#results').html('<div style="text-align: center; color: red">Invalid input data.</div>');
+                        } else {
+                            $('#results').html('<pre>Error: ' + JSON.stringify(error) + '</pre>');
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
